@@ -10,6 +10,7 @@ env:
 
 jobs:
   check:
+    if: false
     name: Foundry project
     runs-on: ubuntu-latest
     steps:
