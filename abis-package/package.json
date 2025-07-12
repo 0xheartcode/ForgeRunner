@@ -1,0 +1,21 @@
+{
+  "name": "@0xheartcode/forgerunner-abis",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xheartcode/ForgeRunner.git"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
