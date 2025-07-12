@@ -391,10 +391,14 @@ exports.deployments = require('./deployments.json');
 
   // Compile TypeScript for .d.ts files
   try {
-    execSync('npx tsc index.ts --declaration --emitDeclarationOnly --resolveJsonModule --esModuleInterop --outDir .', { cwd: distDir });
+    execSync('npx --package=typescript tsc index.ts --declaration --emitDeclarationOnly --resolveJsonModule --esModuleInterop --target ES2020 --module commonjs --outDir .', { 
+      cwd: distDir,
+      stdio: 'pipe'
+    });
     console.log('✅ Generated TypeScript declarations');
   } catch (e) {
     console.warn('⚠️  TypeScript compilation failed:', e.message);
+    console.warn('Package will be published without .d.ts files');
   }
 };
 
