@@ -1,0 +1,94 @@
+name: Publish ABIs Package
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      allow_mismatched_names:
+        description: 'Allow mismatched contract names (filename vs contract name inside file)'
+        type: boolean
+        default: false 
+        required: false
+      allow_interfaces:
+        description: 'Include interface files (starting with I) in the build'
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for tag history
+
+      - name: Extract package scope
+        id: package-info
+        run: echo "scope=$(node -p "require('./abis-package/package.json').name.split('/')[0]")" >> $GITHUB_OUTPUT
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://npm.pkg.github.com'
+          scope: ${{ steps.package-info.outputs.scope }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build contracts
+        run: forge build
+
+      - name: Configure build flags
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          cd abis-package
+          echo "Configuring build flags based on workflow inputs..."
+          echo "ALLOW_MISMATCHED_NAMES: ${{ github.event.inputs.allow_mismatched_names }}"
+          echo "ALLOW_INTERFACES: ${{ github.event.inputs.allow_interfaces }}"
+          
+          # Update build-config.js with workflow input values
+          sed -i "s/const ALLOW_MISMATCHED_NAMES = [^;]*/const ALLOW_MISMATCHED_NAMES = ${{ github.event.inputs.allow_mismatched_names }}/g" build-config.js
+          sed -i "s/const ALLOW_INTERFACES = [^;]*/const ALLOW_INTERFACES = ${{ github.event.inputs.allow_interfaces }}/g" build-config.js
+          
+          echo "Updated build-config.js:"
+          grep -E "(ALLOW_MISMATCHED_NAMES|ALLOW_INTERFACES)" build-config.js
+
+      - name: Prepare package
+        run: |
+          cd abis-package
+          
+          # Extract package name from package.json
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            # Get the latest published version from npm and increment patch version
+            CURRENT_VERSION=$(npm view "$PACKAGE_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
+            VERSION=$(echo $CURRENT_VERSION | awk -F. -v OFS=. '{$NF++;print}')
+            echo "Current version: $CURRENT_VERSION, New version: $VERSION"
+          fi
+          
+          npm version $VERSION --no-git-tag-version
+          npm run build
+          
+          # Copy generated README to root for npm registry display
+          cp dist/README.md README.md
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        run: |
+          cd abis-package
+          npm publish
+          
+          # Tag the commit after successful publish
+          VERSION=$(node -p "require('./package.json').version")
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
