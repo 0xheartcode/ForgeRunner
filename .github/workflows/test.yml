@@ -1,16 +1,16 @@
 name: CI
 
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
+## Workflow disabled  ##
+# on:
+#   push:
+#   pull_request:
+#   workflow_dispatch:
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
   check:
-    if: false
     name: Foundry project
     runs-on: ubuntu-latest
     steps:
