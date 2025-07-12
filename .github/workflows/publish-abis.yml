@@ -66,10 +66,25 @@ jobs:
           if [[ "${{ github.event_name }}" == "release" ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
-            # Get the latest published version from npm and increment patch version
-            CURRENT_VERSION=$(npm view "$PACKAGE_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
-            VERSION=$(echo $CURRENT_VERSION | awk -F. -v OFS=. '{$NF++;print}')
-            echo "Current version: $CURRENT_VERSION, New version: $VERSION"
+            # Smart version increment: use the higher of published vs package.json version
+            PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            
+            echo "Published version: $PUBLISHED_VERSION"
+            echo "Package.json version: $PACKAGE_VERSION"
+            
+            # Compare versions and use the higher one
+            if [[ "$(printf '%s\n' "$PACKAGE_VERSION" "$PUBLISHED_VERSION" | sort -V | tail -n1)" == "$PACKAGE_VERSION" ]]; then
+              BASE_VERSION="$PACKAGE_VERSION"
+              echo "Using package.json version as base: $PACKAGE_VERSION"
+            else
+              BASE_VERSION="$PUBLISHED_VERSION"
+              echo "Using published version as base: $PUBLISHED_VERSION"
+            fi
+            
+            # Increment from the base version
+            VERSION=$(echo $BASE_VERSION | awk -F. -v OFS=. '{$NF++;print}')
+            echo "Incrementing: $BASE_VERSION → $VERSION"
           fi
           
           npm version $VERSION --no-git-tag-version
