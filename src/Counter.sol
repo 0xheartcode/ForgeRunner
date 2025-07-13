@@ -16,12 +16,5 @@ contract Counter {
         number++;
         number++;
     }
-    function decrease() public {
-        number--;
-    }
-    function decreaseTwice() public {
-        number--;
-        number--;
-    }
 
 }
