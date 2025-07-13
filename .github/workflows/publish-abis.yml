@@ -97,7 +97,7 @@ jobs:
             fi
             
             # 3. Get current package.json version (remove branch suffix for comparison)
-            PACKAGE_VERSION_FULL=$(node -p "require('./package.json').version")
+            PACKAGE_VERSION_FULL=$(node -p "require('./package.json').version || '0.0.0'")
             PACKAGE_VERSION=$(echo "$PACKAGE_VERSION_FULL" | cut -d'-' -f1)
             echo "Package.json version: $PACKAGE_VERSION_FULL (base: $PACKAGE_VERSION)"
             
