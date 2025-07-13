@@ -530,8 +530,8 @@ ${failedContractsSection}${(() => {
   const changelogLines = changelogContent.split('\n').filter(line => line.trim()).length;
   
   if (changelogLines <= 40) {
-    // Show full changelog inline
-    return `## Recent Changes\n\n${changelogContent}\n`;
+    // Show full changelog inline with link
+    return `## Recent Changes\n\n${changelogContent}\n\n📄 [View full changelog](./CHANGELOG.md)\n`;
   } else {
     // Show truncated changelog with link
     const lines = changelogContent.split('\n');
@@ -662,7 +662,7 @@ const generateChangelog = () => {
     console.log('📝 Generated changelog with ABI changes');
   } else if (Object.keys(previousABIs).length === 0) {
     console.log('📝 No previous version available for comparison, showing as new package');
-    changelogContent = 'This is the first version of this package. All contracts are new.';
+    changelogContent = 'This is the first version of this package. All contracts are new.\n\n📄 [View full changelog](./CHANGELOG.md)';
   } else {
     console.log('📝 No ABI changes detected');
     // Get the baseline version for the changelog header
@@ -676,7 +676,7 @@ const generateChangelog = () => {
     };
     
     const baselineVersion = getBaselineVersion();
-    changelogContent = `Changes since ${baselineVersion}\n\nNo changes detected - all contracts remain unchanged.`;
+    changelogContent = `Changes since ${baselineVersion}\n\nNo changes detected - all contracts remain unchanged.\n\n📄 [View full changelog](./CHANGELOG.md)`;
   }
   
   return changelogContent;
