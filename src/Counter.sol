@@ -11,4 +11,13 @@ contract Counter {
     function increment() public {
         number++;
     }
+
+    function incrementTwice() public {
+        number++;
+        number++;
+    }
+    function decrease() public {
+        number--;
+    }
+
 }
