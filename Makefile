@@ -151,3 +151,20 @@ env-example: ## Create example .env file
 	@echo "$(GREEN)✓ Created .env.example$(NC)"
 	@echo "$(YELLOW)Copy to .env and fill in your values$(NC)"
 
+##@ 📦 ABI Package Management
+
+abi-build: ## Build ABI package (without auth)
+	@echo "$(YELLOW)Building ABI package...$(NC)"
+	cd abis-package && npm run build
+
+abi-build-local: ## Build ABI package with local auth (requires .npmrc.local)
+	@echo "$(YELLOW)Building ABI package with authentication...$(NC)"
+	cd abis-package && npm run build:local
+
+abi-setup-local: ## Create template for .npmrc.local
+	@echo "$(YELLOW)Creating .npmrc.local template...$(NC)"
+	@echo "@0xheartcode:registry=https://npm.pkg.github.com" > abis-package/.npmrc.local
+	@echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT_HERE" >> abis-package/.npmrc.local
+	@echo "$(GREEN)✓ Created abis-package/.npmrc.local$(NC)"
+	@echo "$(YELLOW)Edit the file and replace YOUR_GITHUB_PAT_HERE with your GitHub Personal Access Token$(NC)"
+
