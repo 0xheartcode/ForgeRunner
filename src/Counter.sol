@@ -16,5 +16,13 @@ contract Counter {
         number++;
         number++;
     }
+    function decreaseTriple() public {
+        number--;
+        number--;
+        number--;
+    }
+    function setAnotherNumber(uint256 newNumber1_, uint256 newNumber2_) public {
+        number = newNumber1_;
+    }
 
 }
