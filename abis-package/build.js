@@ -176,6 +176,36 @@ const displayName = packageScope.replace('@', '').split('-').map(word =>
   word.charAt(0).toUpperCase() + word.slice(1)
 ).join(' ');
 
+// Utility function to format function signature from ABI
+const formatFunctionSignature = (functionABI) => {
+  if (!functionABI || functionABI.type !== 'function') {
+    return '';
+  }
+
+  const name = functionABI.name;
+  
+  // Format inputs
+  const inputs = functionABI.inputs || [];
+  const inputsStr = inputs.map(input => {
+    const paramName = input.name || '_param';
+    return `${input.type} ${paramName}`;
+  }).join(', ');
+  
+  // Format outputs
+  const outputs = functionABI.outputs || [];
+  const outputsStr = outputs.length > 0 
+    ? ` returns (${outputs.map(output => output.type).join(', ')})`
+    : '';
+  
+  // Add state mutability if relevant
+  const stateMutability = functionABI.stateMutability;
+  const modifierStr = (stateMutability && ['view', 'pure', 'payable'].includes(stateMutability))
+    ? ` ${stateMutability}`
+    : '';
+
+  return `${name}(${inputsStr})${modifierStr}${outputsStr}`;
+};
+
 // Utility function to compare ABIs
 const compareABIs = (oldABI, newABI, contractName) => {
   const changes = {
@@ -185,63 +215,95 @@ const compareABIs = (oldABI, newABI, contractName) => {
   };
 
   if (!oldABI) {
+    // For new contracts, show all functions as added
+    const allFunctions = newABI.filter(item => item.type === 'function');
+    changes.added = allFunctions.map(func => formatFunctionSignature(func));
     return { isNew: true, changes };
   }
 
-  const oldFunctions = oldABI.filter(item => item.type === 'function').map(f => f.name);
-  const newFunctions = newABI.filter(item => item.type === 'function').map(f => f.name);
+  const oldFunctions = oldABI.filter(item => item.type === 'function');
+  const newFunctions = newABI.filter(item => item.type === 'function');
 
-  changes.added = newFunctions.filter(f => !oldFunctions.includes(f));
-  changes.removed = oldFunctions.filter(f => !newFunctions.includes(f));
+  // Find added functions (in new but not in old)
+  newFunctions.forEach(newFunc => {
+    const exists = oldFunctions.find(oldFunc => oldFunc.name === newFunc.name);
+    if (!exists) {
+      changes.added.push(formatFunctionSignature(newFunc));
+    }
+  });
 
-  // Check for signature changes
-  oldABI.filter(item => item.type === 'function').forEach(oldFunc => {
-    const newFunc = newABI.find(item => item.type === 'function' && item.name === oldFunc.name);
+  // Find removed functions (in old but not in new)
+  oldFunctions.forEach(oldFunc => {
+    const exists = newFunctions.find(newFunc => newFunc.name === oldFunc.name);
+    if (!exists) {
+      changes.removed.push(formatFunctionSignature(oldFunc));
+    }
+  });
+
+  // Find modified functions (same name but different signature)
+  oldFunctions.forEach(oldFunc => {
+    const newFunc = newFunctions.find(f => f.name === oldFunc.name);
     if (newFunc && JSON.stringify(oldFunc) !== JSON.stringify(newFunc)) {
-      changes.modified.push(oldFunc.name);
+      const oldSig = formatFunctionSignature(oldFunc);
+      const newSig = formatFunctionSignature(newFunc);
+      changes.modified.push({ oldSignature: oldSig, newSignature: newSig });
     }
   });
 
   return { isNew: false, changes };
 };
 
-// Function to get previous package version ABIs from npm
+// Function to get previous package version ABIs using git history
 const getPreviousABIs = () => {
   try {
+    // Find the latest published version tag in current branch's git history
+    const getBaselineVersion = () => {
+      try {
+        const latestTag = execSync('git tag --merged HEAD | sort -V | tail -1', { encoding: 'utf8' }).trim();
+        if (latestTag && latestTag.startsWith('v')) {
+          return latestTag.replace('v', '');
+        }
+        return '0.0.0'; // No tags in history = first version
+      } catch (e) {
+        return '0.0.0';
+      }
+    };
+
+    const baselineVersion = getBaselineVersion();
     
-    // Get the current published version from npm
-    const currentVersion = execSync(`npm view ${packageName}@${packageVersion} version 2>/dev/null || echo "0.0.0"`, { encoding: 'utf8' }).trim();
-    if (currentVersion === '0.0.0') {
-      console.log('📝 No previous version found, treating all contracts as new');
+    if (baselineVersion === '0.0.0') {
+      console.log('📝 No previous version found in git history, treating all contracts as new');
       return {};
     }
     
-    console.log(`📝 Comparing against published version ${currentVersion}`);
+    console.log(`📝 Comparing against baseline version ${baselineVersion} from git history`);
     const previousABIs = {};
     
     // Try to download and extract the previous package
     const tempDir = require('os').tmpdir();
-    const packagePath = require('path').join(tempDir, `previous-package-${Date.now()}.tgz`);
     
     try {
-      // Download the previous package
-      execSync(`npm pack ${packageName}@${currentVersion} --pack-destination ${tempDir}`, { stdio: 'pipe' });
+      // Download the previous package using the baseline version
+      execSync(`npm pack ${packageName}@${baselineVersion} --pack-destination ${tempDir}`, { stdio: 'pipe' });
       
       // Generate expected filename from package name
       // @scope/name becomes scope-name-version.tgz
-      const expectedFilename = packageName.replace('@', '').replace('/', '-') + `-${currentVersion}.tgz`;
+      const expectedFilename = packageName.replace('@', '').replace('/', '-') + `-${baselineVersion}.tgz`;
       
       // Find the downloaded file
       const files = require('fs').readdirSync(tempDir);
       let packageFile = files.find(f => f === expectedFilename);
       
-      // Fallback: just find any .tgz file
+      // Fallback: just find any .tgz file that contains the version
+      if (!packageFile) {
+        packageFile = files.find(f => f.endsWith('.tgz') && f.includes(baselineVersion));
+      }
+      
+      // Last resort: any .tgz file
       if (!packageFile) {
         packageFile = files.find(f => f.endsWith('.tgz'));
       }
       
-      const tgzFiles = files.filter(f => f.endsWith('.tgz'));
-      console.log(`📝 Available .tgz files: ${tgzFiles.join(', ') || 'none'}`);
       console.log(`📝 Selected package file: ${packageFile || 'none found'}`);
       
       if (packageFile) {
@@ -268,7 +330,7 @@ const getPreviousABIs = () => {
           });
         }
         
-        console.log(`📝 Found ${Object.keys(previousABIs).length} contracts in previous version`);
+        console.log(`📝 Found ${Object.keys(previousABIs).length} contracts in baseline version`);
         
         // Cleanup
         try {
@@ -279,11 +341,11 @@ const getPreviousABIs = () => {
         }
         
       } else {
-        console.log(`⚠️  Could not find downloaded package file`);
+        console.log(`⚠️  Could not find package file for version ${baselineVersion}`);
       }
       
     } catch (e) {
-      console.log(`⚠️  Could not download previous package: ${e.message}`);
+      console.log(`⚠️  Could not download baseline package v${baselineVersion}: ${e.message}`);
       return {};
     }
     
@@ -461,7 +523,22 @@ ${contractList}
 
 ${deploymentList}
 
-${failedContractsSection}${changelogContent ? `## Recent Changes\n\n${changelogContent}\n` : ''}
+${failedContractsSection}${(() => {
+  if (!changelogContent) return '';
+  
+  // Count lines in changelog content
+  const changelogLines = changelogContent.split('\n').length;
+  
+  if (changelogLines <= 200) {
+    // Show full changelog inline exactly as it appears in CHANGELOG.md
+    return `${changelogContent}\n`;
+  } else {
+    // Truncate to first 180 lines to stay under 200 total
+    const lines = changelogContent.split('\n');
+    const truncated = lines.slice(0, 180).join('\n');
+    return `${truncated}\n\n... (changelog truncated - see CHANGELOG.md in package for complete history)\n`;
+  }
+})()}
 ## Usage
 
 \`\`\`typescript
@@ -514,51 +591,102 @@ const generateChangelog = () => {
   
   // Only generate changelog if we successfully got previous ABIs
   if (Object.keys(previousABIs).length > 0 && Object.keys(changes).length > 0) {
-    let changelog = `# Changelog\n\n## Changes in this version\n\n`;
-    let readmeChangelog = `### Changes in this version\n\n`;
+    // Get the baseline version for the changelog header
+    const getBaselineVersion = () => {
+      try {
+        const latestTag = execSync('git tag --merged HEAD | sort -V | tail -1', { encoding: 'utf8' }).trim();
+        return latestTag || 'initial';
+      } catch (e) {
+        return 'initial';
+      }
+    };
+
+    const baselineVersion = getBaselineVersion();
+    let changelog = `# Changelog\n\n## Changes since ${baselineVersion}\n\n`;
+    let readmeChangelog = `### Changes since ${baselineVersion}\n\n`;
     
     Object.entries(changes).forEach(([contract, change]) => {
       if (change.isRemoved) {
         changelog += `### ❌ ${contract}\n- **Contract removed**\n\n`;
         readmeChangelog += `- **${contract}**: Contract removed\n`;
       } else if (change.isNew) {
-        changelog += `### ✨ ${contract}\n- **New contract added**\n\n`;
-        readmeChangelog += `- **${contract}**: New contract added\n`;
+        changelog += `### ✨ ${contract} (New Contract)\n`;
+        readmeChangelog += `- **${contract}**: New contract added`;
+        if (change.changes.added.length > 0) {
+          changelog += `- **Added functions**:\n`;
+          change.changes.added.forEach(signature => {
+            changelog += `  - \`${signature}\`\n`;
+          });
+          readmeChangelog += ` with ${change.changes.added.length} functions`;
+        }
+        changelog += '\n';
+        readmeChangelog += '\n';
       } else {
         changelog += `### 🔄 ${contract}\n`;
         readmeChangelog += `- **${contract}**: `;
         const changeTypes = [];
+        
         if (change.changes.added.length > 0) {
-          changelog += `- **Added functions**: ${change.changes.added.join(', ')}\n`;
-          changeTypes.push(`Added: ${change.changes.added.join(', ')}`);
+          changelog += `- **Added functions**:\n`;
+          change.changes.added.forEach(signature => {
+            changelog += `  - \`${signature}\`\n`;
+          });
+          changeTypes.push(`Added ${change.changes.added.length} functions`);
         }
+        
         if (change.changes.removed.length > 0) {
-          changelog += `- **Removed functions**: ${change.changes.removed.join(', ')}\n`;
-          changeTypes.push(`Removed: ${change.changes.removed.join(', ')}`);
+          changelog += `- **Removed functions**:\n`;
+          change.changes.removed.forEach(signature => {
+            changelog += `  - \`${signature}\`\n`;
+          });
+          changeTypes.push(`Removed ${change.changes.removed.length} functions`);
         }
+        
         if (change.changes.modified.length > 0) {
-          changelog += `- **Modified functions**: ${change.changes.modified.join(', ')}\n`;
-          changeTypes.push(`Modified: ${change.changes.modified.join(', ')}`);
+          changelog += `- **Modified functions**:\n`;
+          change.changes.modified.forEach(modification => {
+            changelog += `  - \`${modification.oldSignature}\` → \`${modification.newSignature}\`\n`;
+          });
+          changeTypes.push(`Modified ${change.changes.modified.length} functions`);
         }
+        
         readmeChangelog += changeTypes.join('; ') + '\n';
         changelog += '\n';
       }
     });
 
     fs.writeFileSync(path.join(distDir, 'CHANGELOG.md'), changelog);
-    changelogContent = readmeChangelog;
+    
+    // Return the exact same detailed changelog for README
+    changelogContent = changelog;
     console.log('📝 Generated changelog with ABI changes');
   } else if (Object.keys(previousABIs).length === 0) {
-    console.log('📝 No previous version available for comparison, skipping changelog');
+    console.log('📝 No previous version available for comparison, showing as new package');
+    changelogContent = '# Changelog\n\n## Initial Release\n\nThis is the first version of this package. All contracts are new.';
   } else {
     console.log('📝 No ABI changes detected');
+    // Get the baseline version for the changelog header
+    const getBaselineVersion = () => {
+      try {
+        const latestTag = execSync('git tag --merged HEAD | sort -V | tail -1', { encoding: 'utf8' }).trim();
+        return latestTag || 'previous version';
+      } catch (e) {
+        return 'previous version';
+      }
+    };
+    
+    const baselineVersion = getBaselineVersion();
+    changelogContent = `# Changelog\n\n## Changes since ${baselineVersion}\n\nNo changes detected - all contracts remain unchanged.`;
   }
   
   return changelogContent;
 };
 
 generateIndexFile();
-const changelogContent = generateChangelog();
+const changelogContent = config.ALLOW_CHANGELOG ? generateChangelog() : (() => {
+  console.log('📝 Changelog generation disabled (ALLOW_CHANGELOG=false)');
+  return '';
+})();
 generateReadme(changelogContent);
 
 console.log('🚀 Build completed!');

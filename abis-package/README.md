@@ -72,10 +72,20 @@ const counter = new ethers.Contract(
 
 ## Branch-Based Versioning
 
-This package now uses **automatic branch-based versioning**:
+This package uses **automatic git-history-based versioning**:
 
-- **`main` branch**: Uses base version (e.g., `1.0.0`)
-- **Other branches**: Appends branch name (e.g., `1.0.0-registry-improvised-abis`)
+- **`main` branch**: Uses clean version numbers (e.g., `0.0.1`, `0.0.2`)
+- **Feature branches**: Increment from git history + branch suffix (e.g., `0.0.2-feature-branch`)
+
+### How Versioning Works:
+1. **Find baseline**: Latest version tag in current branch's git history
+2. **Increment**: Add +1 to patch version  
+3. **Add suffix**: Append branch name (except for main)
+
+**Example Flow**:
+- Main: `0.0.1` → `0.0.2` → `0.0.3`
+- Feature branch from `0.0.2`: `0.0.3-feature` → `0.0.4-feature`
+- Another branch from `0.0.3`: `0.0.4-other-feature`
 
 ```bash
 # Install main branch version (using @latest tag)
@@ -84,8 +94,8 @@ npm install @0xheartcode/forgerunner-abis@latest
 # Install specific branch version (using branch tag)
 npm install @0xheartcode/forgerunner-abis@feature-branch
 
-# Install specific version number
-npm install @0xheartcode/forgerunner-abis@1.0.0-feature-branch
+# Install specific version number  
+npm install @0xheartcode/forgerunner-abis@0.0.3-feature-branch
 
 # Install with alias for side-by-side testing
 npm install feature-abis@npm:@0xheartcode/forgerunner-abis@feature-branch
@@ -109,9 +119,9 @@ In package.json:
 ```json
 {
   "dependencies": {
-    "@0xheartcode/forgerunner-abis": "1.0.0",
-    "feature-abis": "npm:@0xheartcode/forgerunner-abis@1.0.0-feature-branch",
-    "test-abis": "npm:@0xheartcode/forgerunner-abis@1.0.0-test-branch"
+    "@0xheartcode/forgerunner-abis": "0.0.2",
+    "feature-abis": "npm:@0xheartcode/forgerunner-abis@0.0.3-feature-branch",
+    "test-abis": "npm:@0xheartcode/forgerunner-abis@0.0.4-test-branch"
   }
 }
 ```

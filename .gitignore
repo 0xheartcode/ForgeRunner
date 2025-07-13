@@ -118,3 +118,5 @@ deployments/localhost/
 # Foundry deployment artifacts
 broadcast.json
 
+
+.npmrc.local
