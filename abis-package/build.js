@@ -523,7 +523,22 @@ ${contractList}
 
 ${deploymentList}
 
-${failedContractsSection}${changelogContent ? `## Recent Changes\n\n${changelogContent}\n` : ''}
+${failedContractsSection}${(() => {
+  if (!changelogContent) return '';
+  
+  // Count lines in changelog content
+  const changelogLines = changelogContent.split('\n').filter(line => line.trim()).length;
+  
+  if (changelogLines <= 40) {
+    // Show full changelog inline
+    return `## Recent Changes\n\n${changelogContent}\n`;
+  } else {
+    // Show truncated changelog with link
+    const lines = changelogContent.split('\n');
+    const truncated = lines.slice(0, 30).join('\n');
+    return `## Recent Changes\n\n${truncated}\n\n... [See full changelog](./CHANGELOG.md)\n\n`;
+  }
+})()}
 ## Usage
 
 \`\`\`typescript
