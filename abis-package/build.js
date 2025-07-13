@@ -656,12 +656,27 @@ const generateChangelog = () => {
     });
 
     fs.writeFileSync(path.join(distDir, 'CHANGELOG.md'), changelog);
-    changelogContent = readmeChangelog;
+    
+    // Return the detailed changelog for README (will be truncated if too long)
+    changelogContent = changelog.replace('# Changelog\n\n## Changes since', 'Changes since').replace(/^\n+/, '');
     console.log('📝 Generated changelog with ABI changes');
   } else if (Object.keys(previousABIs).length === 0) {
-    console.log('📝 No previous version available for comparison, skipping changelog');
+    console.log('📝 No previous version available for comparison, showing as new package');
+    changelogContent = 'This is the first version of this package. All contracts are new.';
   } else {
     console.log('📝 No ABI changes detected');
+    // Get the baseline version for the changelog header
+    const getBaselineVersion = () => {
+      try {
+        const latestTag = execSync('git tag --merged HEAD | sort -V | tail -1', { encoding: 'utf8' }).trim();
+        return latestTag || 'previous version';
+      } catch (e) {
+        return 'previous version';
+      }
+    };
+    
+    const baselineVersion = getBaselineVersion();
+    changelogContent = `Changes since ${baselineVersion}\n\nNo changes detected - all contracts remain unchanged.`;
   }
   
   return changelogContent;
