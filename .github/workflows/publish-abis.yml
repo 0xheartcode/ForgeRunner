@@ -14,6 +14,11 @@ on:
         type: boolean
         default: false
         required: false
+      allow_changelog:
+        description: 'Generate changelog by comparing against previous versions (slower)'
+        type: boolean
+        default: true
+        required: false
 
 jobs:
   publish:
@@ -48,13 +53,15 @@ jobs:
           echo "Configuring build flags based on workflow inputs..."
           echo "ALLOW_MISMATCHED_NAMES: ${{ github.event.inputs.allow_mismatched_names }}"
           echo "ALLOW_INTERFACES: ${{ github.event.inputs.allow_interfaces }}"
+          echo "ALLOW_CHANGELOG: ${{ github.event.inputs.allow_changelog }}"
           
           # Update build-config.js with workflow input values
           sed -i "s/const ALLOW_MISMATCHED_NAMES = [^;]*/const ALLOW_MISMATCHED_NAMES = ${{ github.event.inputs.allow_mismatched_names }}/g" build-config.js
           sed -i "s/const ALLOW_INTERFACES = [^;]*/const ALLOW_INTERFACES = ${{ github.event.inputs.allow_interfaces }}/g" build-config.js
+          sed -i "s/const ALLOW_CHANGELOG = [^;]*/const ALLOW_CHANGELOG = ${{ github.event.inputs.allow_changelog }}/g" build-config.js
           
           echo "Updated build-config.js:"
-          grep -E "(ALLOW_MISMATCHED_NAMES|ALLOW_INTERFACES)" build-config.js
+          grep -E "(ALLOW_MISMATCHED_NAMES|ALLOW_INTERFACES|ALLOW_CHANGELOG)" build-config.js
 
       - name: Prepare package
         run: |
@@ -66,25 +73,50 @@ jobs:
           if [[ "${{ github.event_name }}" == "release" ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
-            # Smart version increment: use the higher of published vs package.json version
-            PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
-            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            # Get current branch name
+            CURRENT_BRANCH=$(git branch --show-current)
+            echo "Current branch: $CURRENT_BRANCH"
             
-            echo "Published version: $PUBLISHED_VERSION"
-            echo "Package.json version: $PACKAGE_VERSION"
+            # 1. Get baseline version from git history
+            GIT_BASELINE_TAG=$(git tag --merged HEAD | grep "^v[0-9]" | sort -V | tail -1 || echo "")
+            GIT_BASELINE_VERSION=${GIT_BASELINE_TAG#v}
+            if [[ -z "$GIT_BASELINE_VERSION" ]]; then
+              GIT_BASELINE_VERSION="0.0.0"
+            fi
+            echo "Git baseline version: $GIT_BASELINE_VERSION"
             
-            # Compare versions and use the higher one
-            if [[ "$(printf '%s\n' "$PACKAGE_VERSION" "$PUBLISHED_VERSION" | sort -V | tail -n1)" == "$PACKAGE_VERSION" ]]; then
-              BASE_VERSION="$PACKAGE_VERSION"
-              echo "Using package.json version as base: $PACKAGE_VERSION"
+            # 2. Get branch-specific published version
+            if [[ "$CURRENT_BRANCH" != "main" ]]; then
+              # For feature branches, check branch-specific version
+              PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME@$CURRENT_BRANCH" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
+              echo "Branch published version: $PUBLISHED_VERSION"
             else
-              BASE_VERSION="$PUBLISHED_VERSION"
-              echo "Using published version as base: $PUBLISHED_VERSION"
+              # For main branch, check latest tag
+              PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME@latest" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "0.0.0")
+              echo "Main published version: $PUBLISHED_VERSION"
             fi
             
-            # Increment from the base version
-            VERSION=$(echo $BASE_VERSION | awk -F. -v OFS=. '{$NF++;print}')
-            echo "Incrementing: $BASE_VERSION → $VERSION"
+            # 3. Get current package.json version (remove branch suffix for comparison)
+            PACKAGE_VERSION_FULL=$(node -p "require('./package.json').version")
+            PACKAGE_VERSION=$(echo "$PACKAGE_VERSION_FULL" | cut -d'-' -f1)
+            echo "Package.json version: $PACKAGE_VERSION_FULL (base: $PACKAGE_VERSION)"
+            
+            # 4. Find the highest version among all three
+            VERSIONS=("$GIT_BASELINE_VERSION" "$PUBLISHED_VERSION" "$PACKAGE_VERSION")
+            BASE_VERSION=$(printf '%s\n' "${VERSIONS[@]}" | sort -V | tail -1)
+            echo "Highest version found: $BASE_VERSION"
+            
+            # 5. Increment the version
+            INCREMENT_VERSION=$(echo $BASE_VERSION | awk -F. -v OFS=. '{$NF++;print}')
+            
+            # 6. Add branch suffix if not on main
+            if [[ "$CURRENT_BRANCH" != "main" ]]; then
+              VERSION="${INCREMENT_VERSION}-${CURRENT_BRANCH}"
+            else
+              VERSION="${INCREMENT_VERSION}"
+            fi
+            
+            echo "Final version: $VERSION"
           fi
           
           npm version $VERSION --no-git-tag-version

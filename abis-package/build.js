@@ -668,7 +668,10 @@ const generateChangelog = () => {
 };
 
 generateIndexFile();
-const changelogContent = generateChangelog();
+const changelogContent = config.ALLOW_CHANGELOG ? generateChangelog() : (() => {
+  console.log('📝 Changelog generation disabled (ALLOW_CHANGELOG=false)');
+  return '';
+})();
 generateReadme(changelogContent);
 
 console.log('🚀 Build completed!');

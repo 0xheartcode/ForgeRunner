@@ -22,6 +22,10 @@ const ALLOW_MISMATCHED_NAMES = false;
 // When true, includes interface files (starting with 'I') in the build
 const ALLOW_INTERFACES = false;
 
+// Generate changelog by comparing against previous versions
+// When false, skips changelog generation to speed up builds
+const ALLOW_CHANGELOG = true;
+
 // Deployment addresses for each network
 const deployments = {
   "Testnet": {
@@ -33,5 +37,6 @@ module.exports = {
   CONTRACT_NAMES,
   deployments,
   ALLOW_MISMATCHED_NAMES,
-  ALLOW_INTERFACES
+  ALLOW_INTERFACES,
+  ALLOW_CHANGELOG
 };
