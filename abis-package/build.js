@@ -527,16 +527,16 @@ ${failedContractsSection}${(() => {
   if (!changelogContent) return '';
   
   // Count lines in changelog content
-  const changelogLines = changelogContent.split('\n').filter(line => line.trim()).length;
+  const changelogLines = changelogContent.split('\n').length;
   
-  if (changelogLines <= 40) {
-    // Show full changelog inline with link
-    return `## Recent Changes\n\n${changelogContent}\n\n📄 [View full changelog](./CHANGELOG.md)\n`;
+  if (changelogLines <= 200) {
+    // Show full changelog inline (GitHub packages can handle up to 200 lines)
+    return `## Recent Changes\n\n${changelogContent}\n`;
   } else {
-    // Show truncated changelog with link
+    // Truncate to first 180 lines to stay under 200 total
     const lines = changelogContent.split('\n');
-    const truncated = lines.slice(0, 30).join('\n');
-    return `## Recent Changes\n\n${truncated}\n\n... [See full changelog](./CHANGELOG.md)\n\n`;
+    const truncated = lines.slice(0, 180).join('\n');
+    return `## Recent Changes\n\n${truncated}\n\n... (changelog truncated - see CHANGELOG.md in package for complete history)\n`;
   }
 })()}
 ## Usage
@@ -662,7 +662,7 @@ const generateChangelog = () => {
     console.log('📝 Generated changelog with ABI changes');
   } else if (Object.keys(previousABIs).length === 0) {
     console.log('📝 No previous version available for comparison, showing as new package');
-    changelogContent = 'This is the first version of this package. All contracts are new.\n\n📄 [View full changelog](./CHANGELOG.md)';
+    changelogContent = 'This is the first version of this package. All contracts are new.';
   } else {
     console.log('📝 No ABI changes detected');
     // Get the baseline version for the changelog header
@@ -676,7 +676,7 @@ const generateChangelog = () => {
     };
     
     const baselineVersion = getBaselineVersion();
-    changelogContent = `Changes since ${baselineVersion}\n\nNo changes detected - all contracts remain unchanged.\n\n📄 [View full changelog](./CHANGELOG.md)`;
+    changelogContent = `Changes since ${baselineVersion}\n\nNo changes detected - all contracts remain unchanged.`;
   }
   
   return changelogContent;
