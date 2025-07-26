@@ -1,0 +1,29 @@
+{
+  "name": "@0xheartcode/forgerunner-contract-exports",
+  "version": "1.0.0",
+  "description": "Contract flattening tool for ForgeRunner Foundry template",
+  "main": "build.js",
+  "bin": {
+    "export-contracts": "./build.js"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "export": "node build.js"
+  },
+  "keywords": [
+    "foundry",
+    "solidity",
+    "flatten",
+    "contracts",
+    "export"
+  ],
+  "author": "0xheartcode",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xheartcode/ForgeRunner"
+  }
+}

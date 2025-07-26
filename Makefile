@@ -14,7 +14,7 @@ ifneq (,$(wildcard .env))
     export
 endif
 
-.PHONY: help clean build test test-fork test-gas coverage deploy deploy-anvil verify format snapshot anvil install update
+.PHONY: help clean build test test-fork test-gas coverage deploy deploy-anvil verify format snapshot anvil install update export-contracts
 
 help: ## Display this help message with target descriptions
 	@awk 'BEGIN {FS = ":.*##"; printf "\n$(BLUE)Forge Project Commands$(NC)\n\nUsage:\n  make $(GREEN)<target>$(NC)\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2 } /^##@/ { printf "\n$(YELLOW)%s$(NC)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -167,4 +167,10 @@ abi-setup-local: ## Create template for .npmrc.local
 	@echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT_HERE" >> abis-package/.npmrc.local
 	@echo "$(GREEN)✓ Created abis-package/.npmrc.local$(NC)"
 	@echo "$(YELLOW)Edit the file and replace YOUR_GITHUB_PAT_HERE with your GitHub Personal Access Token$(NC)"
+
+##@ 📄 Contract Export Management
+
+export-contracts: ## Export flattened contracts to exp-contracts/ directory
+	@echo "$(YELLOW)Exporting flattened contracts...$(NC)"
+	cd contract-exports && node build.js
 
