@@ -1,0 +1,31 @@
+{
+  "name": "@0xheartcode/forgerunner-solidity-style-checker",
+  "version": "1.0.0",
+  "description": "Solidity style guide checker for ForgeRunner Foundry template",
+  "main": "checker.js",
+  "bin": {
+    "style-check": "./checker.js"
+  },
+  "scripts": {
+    "check": "node checker.js",
+    "lint": "node checker.js"
+  },
+  "keywords": [
+    "solidity",
+    "style",
+    "guide",
+    "checker",
+    "linter",
+    "foundry",
+    "coinbase"
+  ],
+  "author": "0xheartcode",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xheartcode/ForgeRunner"
+  }
+}

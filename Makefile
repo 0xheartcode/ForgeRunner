@@ -14,7 +14,7 @@ ifneq (,$(wildcard .env))
     export
 endif
 
-.PHONY: help clean build test test-fork test-gas coverage deploy deploy-anvil verify format snapshot anvil install update export-contracts
+.PHONY: help clean build test test-fork test-gas coverage deploy deploy-anvil verify format snapshot anvil install update export-contracts lint-style
 
 help: ## Display this help message with target descriptions
 	@awk 'BEGIN {FS = ":.*##"; printf "\n$(BLUE)Forge Project Commands$(NC)\n\nUsage:\n  make $(GREEN)<target>$(NC)\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2 } /^##@/ { printf "\n$(YELLOW)%s$(NC)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -173,4 +173,10 @@ abi-setup-local: ## Create template for .npmrc.local
 export-contracts: ## Export flattened contracts to exp-contracts/ directory
 	@echo "$(YELLOW)Exporting flattened contracts...$(NC)"
 	cd contract-exports && node build.js
+
+##@ 🎯 Code Quality
+
+lint-style: ## Check Solidity code style and conventions
+	@echo "$(YELLOW)Checking Solidity style guide compliance...$(NC)"
+	cd solidity-style-checker && node checker.js
 
