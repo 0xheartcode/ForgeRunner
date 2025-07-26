@@ -1,0 +1,123 @@
+name: Export Contracts
+on:
+  push:
+    branches: [contract-exports]
+  workflow_dispatch:
+    inputs:
+      disable_comments:
+        description: 'Remove comments from exported contracts (preserve license)'
+        type: boolean
+        default: false 
+        required: false
+      preserve_structure:
+        description: 'Preserve source directory structure in exports'
+        type: boolean
+        default: false
+        required: false
+      export_branch:
+        description: 'Branch to export contracts from'
+        type: string
+        default: 'main'
+        required: false
+      contract_names:
+        description: 'Contracts to export (comma-separated) or "*" for all'
+        type: string
+        default: '*'
+        required: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.export_branch || github.ref }}
+          fetch-depth: 0
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build contracts
+        run: forge build
+
+      - name: Configure export settings
+        run: |
+          cd contract-exports
+          echo "Configuring export settings..."
+          
+          # Set disable comments
+          DISABLE_COMMENTS=${{ github.event.inputs.disable_comments || 'false' }}
+          echo "DISABLE_COMMENTS: $DISABLE_COMMENTS"
+          sed -i "s/const DISABLE_COMMENTS = [^;]*/const DISABLE_COMMENTS = $DISABLE_COMMENTS/g" build-config.js
+          
+          # Set preserve structure
+          PRESERVE_STRUCTURE=${{ github.event.inputs.preserve_structure || 'false' }}
+          echo "PRESERVE_STRUCTURE: $PRESERVE_STRUCTURE"
+          sed -i "s/const PRESERVE_STRUCTURE = [^;]*/const PRESERVE_STRUCTURE = $PRESERVE_STRUCTURE/g" build-config.js
+          
+          # Set contract names
+          CONTRACT_NAMES="${{ github.event.inputs.contract_names || '*' }}"
+          echo "CONTRACT_NAMES: $CONTRACT_NAMES"
+          if [[ "$CONTRACT_NAMES" == "*" ]]; then
+            sed -i "s/const CONTRACT_NAMES = \[[^\]]*\]/const CONTRACT_NAMES = ['*']/g" build-config.js
+          else
+            # Convert comma-separated list to array format
+            FORMATTED_NAMES=$(echo "$CONTRACT_NAMES" | sed "s/,/','/g" | sed "s/^/['/" | sed "s/$/']/" | sed "s/ //g")
+            sed -i "s/const CONTRACT_NAMES = \[[^\]]*\]/const CONTRACT_NAMES = $FORMATTED_NAMES/g" build-config.js
+          fi
+          
+          echo "Updated build-config.js:"
+          grep -E "(CONTRACT_NAMES|DISABLE_COMMENTS|PRESERVE_STRUCTURE)" build-config.js
+
+      - name: Export contracts
+        run: |
+          echo "🚀 Exporting contracts..."
+          cd contract-exports && node build.js
+          
+          echo "📊 Export results:"
+          if [ -d "../exp-contracts" ]; then
+            echo "✅ Exported contracts:"
+            find ../exp-contracts -name "*.sol" -type f | while read file; do
+              echo "  📄 $(basename "$file")"
+            done
+          else
+            echo "❌ No contracts exported"
+            exit 1
+          fi
+
+      - name: Commit exported contracts
+        run: |
+          #git config --local user.email "action@github.com"
+          #git config --local user.name "GitHub Action"
+          
+          # Add exported contracts
+          git add exp-contracts/
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            # Create commit message with export details
+            BRANCH_NAME=${{ github.event.inputs.export_branch || github.ref_name }}
+            DISABLE_COMMENTS=${{ github.event.inputs.disable_comments || 'false' }}
+            PRESERVE_STRUCTURE=${{ github.event.inputs.preserve_structure || 'false' }}
+            CONTRACT_NAMES="${{ github.event.inputs.contract_names || '*' }}"
+            TRIGGER_TYPE=${{ github.event_name }}
+            
+            COMMIT_MSG="feat: export contracts from $BRANCH_NAME
+
+Export configuration:
+- Comments removed: $DISABLE_COMMENTS
+- Preserve structure: $PRESERVE_STRUCTURE  
+- Contracts: $CONTRACT_NAMES
+- Trigger: $TRIGGER_TYPE
+
+            git commit -m "$COMMIT_MSG"
+            git push origin HEAD
+            
+            echo "✅ Exported contracts committed and pushed"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
